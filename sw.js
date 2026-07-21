@@ -1,38 +1,36 @@
-const CACHE_NAME = "saham-analyzer-v1";
-const ASSETS = ["./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js');
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {})
-  );
-  self.skipWaiting();
-});
+const CACHE = "pwabuilder-page";
+const offlineFallbackPage = "offline.html";
 
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
-  // Never cache the live data API calls — those must always hit the network fresh.
-  if (e.request.url.indexOf("finance.yahoo.com") !== -1 || e.request.url.indexOf("corsproxy.io") !== -1 || e.request.url.indexOf("allorigins.win") !== -1) {
-    return;
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
   }
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const fetchPromise = fetch(e.request)
-        .then((networkRes) => {
-          if (networkRes && networkRes.ok && e.request.url.indexOf(self.location.origin) === 0) {
-            const clone = networkRes.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-          }
-          return networkRes;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+});
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.add(offlineFallbackPage))
   );
+});
+
+if (workbox.navigationPreload.isSupported()) {
+  workbox.navigationPreload.enable();
+}
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        const preloadResp = await event.preloadResponse;
+        if (preloadResp) return preloadResp;
+
+        return await fetch(event.request);
+      } catch (error) {
+        const cache = await caches.open(CACHE);
+        return await cache.match(offlineFallbackPage);
+      }
+    })());
+  }
 });
