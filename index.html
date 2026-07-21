@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Saham Indonesia — Technical Analyzer</title>
+<meta name="theme-color" content="#060f1a">
+<meta name="description" content="Analisis teknikal saham IDX: SMA, EMA, RSI, MACD, Bollinger, ATR, OBV, trend line, dan sinyal konfluensi — 100% dihitung dari data real, tanpa AI.">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+  :root {
+    --bg:#060f1a; --surf:#0a1828; --card:#0d2040; --bdr:#143058;
+    --cyan:#00e5ff; --green:#00ff80; --red:#ff3d5a; --amber:#fbbf24;
+    --purple:#c084fc; --text:#e2e8f0; --muted:#5b7996; --dim:#22405f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; background:var(--bg); color:var(--text);
+    font-family: Inter, system-ui, -apple-system, sans-serif; }
+  body { padding-bottom:56px; }
+  .hidden { display:none !important; }
+  header { position:relative; overflow:hidden; padding:28px 18px 22px; text-align:center;
+    background:linear-gradient(180deg, var(--surf), transparent); border-bottom:1px solid var(--bdr); }
+  header::before { content:""; position:absolute; inset:0;
+    background-image:radial-gradient(#00e5ff08 1px, transparent 1px); background-size:26px 26px; }
+  header .inner { position:relative; }
+  .eyebrow { font-size:10px; color:var(--cyan); letter-spacing:5px; font-family:monospace; margin-bottom:8px; }
+  h1 { margin:0 0 5px; font-weight:900; letter-spacing:-1px; font-size:clamp(21px,5vw,34px);
+    background:linear-gradient(135deg, var(--cyan), #fff 50%, var(--green));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .subtitle { color:var(--muted); font-size:11.5px; margin:0; }
+  .container { max-width:980px; margin:0 auto; padding:20px 14px 0; }
+
+  .input-row { display:flex; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+  .input-wrap { position:relative; flex:1 1 110px; min-width:100px; }
+  .input-prefix { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--cyan);
+    font-family:monospace; font-weight:900; font-size:17px; z-index:1; pointer-events:none; }
+  input[type=text] { width:100%; box-sizing:border-box; padding:13px 10px 13px 32px; border-radius:12px;
+    border:1.5px solid var(--bdr); background:var(--surf); color:var(--text); font-size:17px; font-weight:800;
+    font-family:monospace; letter-spacing:2px; outline:none; }
+  input[type=text]:focus { border-color:var(--cyan); }
+  button#analyzeBtn { flex:0 0 auto; padding:13px 22px; border-radius:12px; font-weight:900; font-size:14px;
+    letter-spacing:1px; border:none; white-space:nowrap; cursor:pointer;
+    background:linear-gradient(135deg, var(--cyan), #0090bf); color:#000; font-family:inherit; }
+  button#analyzeBtn:disabled { background:var(--surf); color:var(--dim); cursor:not-allowed; }
+  .hint { font-size:10.5px; color:var(--dim); font-family:monospace; margin-bottom:18px; padding-left:2px; line-height:1.6; }
+
+  .loading-box { background:var(--surf); border:1px solid var(--bdr); border-radius:18px; padding:40px 20px; text-align:center; }
+  .loading-title { font-size:10px; color:var(--cyan); letter-spacing:4px; font-family:monospace; margin-bottom:18px; }
+  .step { display:flex; align-items:center; gap:12px; max-width:400px; margin:0 auto 10px; color:var(--dim); font-size:13.5px; text-align:left; }
+  .step.done { color:var(--green); } .step.active { color:var(--text); }
+  .step .mark { font-family:monospace; width:16px; flex-shrink:0; }
+  .step.done .mark { color:var(--green); } .step.active .mark { color:var(--cyan); }
+
+  .error-box { background:#150910; border:1px solid #ff3d5a66; border-radius:14px; padding:18px; }
+  .error-title { font-size:10px; color:var(--red); letter-spacing:3px; font-family:monospace; margin-bottom:8px; }
+  .error-msg { color:#ff8099; font-size:13.5px; line-height:1.8; white-space:pre-wrap; }
+  .retry-btn { margin-top:12px; padding:9px 18px; border-radius:9px; border:1px solid var(--red); background:transparent;
+    color:var(--red); font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; }
+
+  .hero { background:linear-gradient(135deg, var(--card), var(--surf)); border:1px solid var(--bdr); border-radius:20px;
+    padding:20px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:flex-start; }
+  .hero-idx { font-size:10px; color:var(--cyan); letter-spacing:5px; font-family:monospace; margin-bottom:4px; }
+  .hero-ticker { font-size:24px; font-weight:900; color:var(--text); font-family:monospace; letter-spacing:-1px; }
+  .hero-co { font-size:12.5px; color:var(--muted); margin:3px 0 10px; }
+  .hero-price-row { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+  .hero-price { font-size:22px; font-weight:900; color:var(--text); font-family:monospace; }
+  .hero-pct { font-size:12.5px; font-weight:700; font-family:monospace; }
+  .price-badge { display:inline-block; margin-top:7px; font-size:9.5px; font-family:monospace; padding:2px 9px; border-radius:7px; }
+  .hero-right { display:flex; gap:10px; align-items:center; }
+  .score-circle { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; background:var(--bg); }
+  .score-num { font-size:19px; font-weight:900; font-family:monospace; }
+  .score-label { font-size:8.5px; color:var(--dim); margin-top:4px; letter-spacing:1.5px; text-align:center; }
+  .rec-box { padding:12px 20px; border-radius:14px; text-align:center; }
+  .rec-text { font-size:20px; font-weight:900; font-family:monospace; letter-spacing:2px; }
+  .rec-label { font-size:8.5px; color:var(--dim); letter-spacing:2px; margin-top:3px; }
+
+  .tabs { display:flex; gap:5px; margin-bottom:11px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch; }
+  .tab-btn { padding:8px 13px; border-radius:10px; border:1px solid var(--bdr); background:var(--surf); color:var(--muted);
+    font-size:12px; font-weight:700; font-family:monospace; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+  .tab-btn.active { border-color:var(--cyan); background:#00e5ff18; color:var(--cyan); }
+
+  .panel { background:var(--card); border:1px solid var(--bdr); border-radius:16px; padding:17px; margin-bottom:12px; }
+  .panel-title { font-size:10px; color:var(--cyan); letter-spacing:3px; margin-bottom:11px; }
+  .chip-row { display:flex; gap:6px; margin-bottom:11px; flex-wrap:wrap; }
+  .chip { padding:3px 11px; border-radius:20px; font-size:10.5px; font-weight:700; font-family:monospace; }
+  .desc { color:var(--muted); font-size:12.5px; line-height:1.7; margin:0 0 11px; }
+  .irow { display:flex; justify-content:space-between; align-items:center; padding:6.5px 0; border-bottom:1px solid var(--bdr); }
+  .irow:last-child { border-bottom:none; }
+  .irow-label { color:var(--muted); font-size:12.5px; font-family:monospace; }
+
+  .gauge { margin-bottom:13px; }
+  .gauge-top { display:flex; justify-content:space-between; margin-bottom:5px; }
+  .gauge-label { color:var(--muted); font-size:12.5px; }
+  .gauge-val { font-size:14.5px; font-weight:900; font-family:monospace; }
+  .gauge-track { background:var(--bg); border-radius:4px; height:6px; position:relative; }
+  .gauge-fill { height:100%; border-radius:4px; }
+  .gauge-thresh { display:flex; justify-content:space-between; margin-top:3px; font-size:8.5px; font-family:monospace; }
+
+  .badge-box { border-radius:8px; padding:7px 11px; margin-bottom:11px; font-size:11.5px; font-weight:700; }
+  .ema-note { margin-top:11px; padding:9px 11px; border-radius:10px; background:#c084fc12; border:1px solid #c084fc33; font-size:10.5px; color:var(--purple); line-height:1.6; }
+
+  canvas#priceChart { width:100%; height:220px; display:block; border-radius:12px; background:var(--bg); margin-bottom:12px; touch-action:none; }
+  .legend { display:flex; gap:11px; flex-wrap:wrap; margin-bottom:14px; font-size:9.5px; font-family:monospace; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; color:var(--muted); }
+  .legend i { width:11px; height:2.5px; border-radius:2px; display:inline-block; }
+
+  .sr-row { display:flex; justify-content:space-between; align-items:center; padding:6.5px 0; border-bottom:1px solid var(--bdr); }
+  .sr-row:last-of-type { border-bottom:none; }
+  .sr-tag { font-family:monospace; font-size:10.5px; font-weight:900; padding:2px 8px; border-radius:6px; }
+  .sr-val { font-family:monospace; font-size:12.5px; font-weight:700; }
+  .fib-row { display:flex; justify-content:space-between; padding:4.5px 0; font-size:11.5px; font-family:monospace; }
+
+  .risk-panel { background:var(--card); border:1px solid #00e5ff44; border-radius:18px; padding:19px; margin-bottom:12px; }
+  .risk-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)); gap:9px; }
+  .risk-card { background:var(--surf); border-radius:12px; padding:12px 8px; text-align:center; border:1px solid var(--bdr); }
+  .risk-icon { font-size:17px; margin-bottom:4px; }
+  .risk-label { font-size:8.5px; color:var(--dim); letter-spacing:1.3px; margin-bottom:5px; }
+  .risk-val { font-size:10.5px; font-weight:900; font-family:monospace; line-height:1.4; word-break:break-word; }
+
+  .vote-table { width:100%; border-collapse:collapse; margin-top:4px; }
+  .vote-table td { padding:8px 4px; border-bottom:1px solid var(--bdr); font-size:12px; }
+  .vote-table tr:last-child td { border-bottom:none; }
+  .vote-label { color:var(--muted); font-family:monospace; }
+  .vote-mark { text-align:right; font-family:monospace; font-weight:900; }
+
+  .score-bar-wrap { margin:6px 0 16px; }
+  .score-bar-track { background:var(--bg); border-radius:6px; height:14px; position:relative; overflow:hidden; border:1px solid var(--bdr); }
+  .score-bar-fill { height:100%; border-radius:6px; transition:width .4s; }
+  .score-bar-labels { display:flex; justify-content:space-between; font-size:9px; color:var(--dim); font-family:monospace; margin-top:4px; }
+
+  .two-col { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:11px; margin-bottom:12px; }
+  .list-panel-title { font-size:10px; letter-spacing:3px; margin-bottom:10px; }
+  .list-item { display:flex; gap:8px; margin-bottom:7px; align-items:flex-start; font-size:12.5px; line-height:1.6; }
+  .list-item .bullet { font-size:11px; flex-shrink:0; margin-top:1px; }
+
+  .summary-box { background:var(--card); border:1px solid var(--bdr); border-radius:16px; padding:18px; margin-bottom:12px; }
+  .summary-text { color:var(--muted); font-size:13px; line-height:1.8; margin:0; }
+  .disclaimer { text-align:center; color:var(--dim); font-size:10.5px; font-family:monospace; padding:8px; line-height:1.7; }
+  .install-hint { text-align:center; color:var(--dim); font-size:10px; font-family:monospace; padding:4px 8px 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="eyebrow">◈ TECHNICAL ANALYZER — 100% REAL DATA ◈</div>
+    <h1>SAHAM INDONESIA</h1>
+    <p class="subtitle">SMA · EMA · RSI · MACD · Bollinger · ATR · OBV · Trend Line · Sinyal Konfluensi</p>
+  </div>
+</header>
+
+<div class="container">
+  <div class="input-row">
+    <div class="input-wrap" style="flex:1 1 100px;">
+      <span class="input-prefix">$</span>
+      <input type="text" id="tickerInput" placeholder="TPIA…" maxlength="6" autocomplete="off">
+    </div>
+    <button id="analyzeBtn">ANALISA →</button>
+  </div>
+  <div class="hint" id="hintText">✦ Data OHLCV 1 tahun diambil otomatis · semua indikator dihitung real, tanpa AI, tanpa batas kuota</div>
+
+  <div id="loadingBox" class="loading-box hidden">
+    <div class="loading-title" id="loadingTitle">■ MENGANALISA ■</div>
+    <div class="step" data-step="0"><span class="mark">○</span>📡 Mengambil data OHLCV 1 tahun…</div>
+    <div class="step" data-step="1"><span class="mark">○</span>🧮 Menghitung SMA · EMA · RSI · MACD · Bollinger · ATR · OBV…</div>
+    <div class="step" data-step="2"><span class="mark">○</span>📐 Menyusun garis trend & sinyal konfluensi…</div>
+  </div>
+
+  <div id="errorBox" class="error-box hidden">
+    <div class="error-title">⚠ GAGAL MENGAMBIL DATA</div>
+    <div class="error-msg" id="errorMsg"></div>
+    <button class="retry-btn" id="retryBtn">↻ Coba Lagi</button>
+  </div>
+
+  <div id="resultsBox" class="hidden"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================== THEME / HELPERS ============================== */
+  var C = {
+    bg:"#060f1a", surf:"#0a1828", card:"#0d2040", bdr:"#143058",
+    cyan:"#00e5ff", green:"#00ff80", red:"#ff3d5a", amber:"#fbbf24",
+    purple:"#c084fc", text:"#e2e8f0", muted:"#5b7996", dim:"#22405f",
+  };
+  function N(v, d) { d = d == null ? 0 : d; var n = Number(v); return Number.isFinite(n) ? n : d; }
+  function idr(v) { var n = N(v, NaN); return Number.isFinite(n) && n !== 0 ? "Rp " + Math.round(n).toLocaleString("id-ID") : "–"; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (ch) { return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]; }); }
+  function dC(sign) { return sign > 0 ? C.green : sign < 0 ? C.red : C.amber; }
+  function scC(s) { return s >= 6.5 ? C.green : s >= 4.5 ? C.amber : C.red; }
+  function recC(r) { return ({ BUY:[C.green,"#00ff8016"], SELL:[C.red,"#ff3d5a16"], HOLD:[C.amber,"#fbbf2416"] })[r] || [C.muted,"transparent"]; }
+
+  /* ============================== INDICATOR MATH ============================== */
+  function sma(arr, p) { if (arr.length < p) return null; var s=0; for (var i=arr.length-p;i<arr.length;i++) s+=arr[i]; return s/p; }
+  function smaSeries(arr, p) {
+    var out = new Array(arr.length).fill(null);
+    for (var i = p-1; i < arr.length; i++) { var s=0; for (var j=i-p+1;j<=i;j++) s+=arr[j]; out[i]=s/p; }
+    return out;
+  }
+  function emaSeries(arr, p) {
+    if (arr.length < p) return arr.map(function(){return null;});
+    var k = 2/(p+1), out = new Array(arr.length).fill(null), seed=0;
+    for (var i=0;i<p;i++) seed+=arr[i];
+    out[p-1]=seed/p;
+    for (var i=p;i<arr.length;i++) out[i]=arr[i]*k+out[i-1]*(1-k);
+    return out;
+  }
+  function emaLast(arr, p) { var s=emaSeries(arr,p); return s[s.length-1]; }
+  function rsi(closes, p) {
+    p = p || 14;
+    if (closes.length < p+1) return 50;
+    var gains=0, losses=0;
+    for (var i=1;i<=p;i++){ var d=closes[i]-closes[i-1]; if(d>0) gains+=d; else losses-=d; }
+    var avgGain=gains/p, avgLoss=losses/p;
+    for (var i=p+1;i<closes.length;i++){ var d=closes[i]-closes[i-1]; avgGain=(avgGain*(p-1)+Math.max(d,0))/p; avgLoss=(avgLoss*(p-1)+Math.max(-d,0))/p; }
+    if (avgLoss===0) return 100;
+    return 100-100/(1+avgGain/avgLoss);
+  }
+  function macd(closes) {
+    if (closes.length < 35) return { hist:0, line:0, signal:0 };
+    var fast=emaSeries(closes,12), slow=emaSeries(closes,26), macdLine=[];
+    for (var i=0;i<closes.length;i++) if(fast[i]!=null && slow[i]!=null) macdLine.push(fast[i]-slow[i]);
+    if (macdLine.length<9){ var last=macdLine[macdLine.length-1]||0; return {hist:last,line:last,signal:0}; }
+    var sig=emaSeries(macdLine,9), line=macdLine[macdLine.length-1], signal=sig[sig.length-1];
+    return { hist: line-signal, line: line, signal: signal };
+  }
+  function stochastic(closes, highs, lows, p) {
+    p = p || 14;
+    if (closes.length < p) return 50;
+    var rc=closes.slice(-p), rh=highs.slice(-p), rl=lows.slice(-p);
+    var hh=Math.max.apply(null,rh), ll=Math.min.apply(null,rl);
+    if (hh===ll) return 50;
+    return ((rc[rc.length-1]-ll)/(hh-ll))*100;
+  }
+  function bollinger(closes, p, mult) {
+    p = p||20; mult = mult||2;
+    if (closes.length < p) return null;
+    var slice = closes.slice(-p), mid=0;
+    for (var i=0;i<slice.length;i++) mid+=slice[i]; mid/=p;
+    var variance=0; for (var i=0;i<slice.length;i++) variance += (slice[i]-mid)*(slice[i]-mid); variance/=p;
+    var sd = Math.sqrt(variance), upper=mid+mult*sd, lower=mid-mult*sd, last=closes[closes.length-1];
+    var pctB = upper===lower ? 0.5 : (last-lower)/(upper-lower);
+    return { mid:mid, upper:upper, lower:lower, pctB:pctB, sd:sd };
+  }
+  function atr(closes, highs, lows, p) {
+    p = p||14;
+    if (closes.length < p+1) return null;
+    var trs=[];
+    for (var i=1;i<closes.length;i++) trs.push(Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1])));
+    var a=0; for (var i=0;i<p;i++) a+=trs[i]; a/=p;
+    for (var i=p;i<trs.length;i++) a=(a*(p-1)+trs[i])/p;
+    return a;
+  }
+  function obvSeries(closes, volumes) {
+    var out=[0];
+    for (var i=1;i<closes.length;i++) {
+      var prev=out[i-1];
+      if (closes[i]>closes[i-1]) out.push(prev+(volumes[i]||0));
+      else if (closes[i]<closes[i-1]) out.push(prev-(volumes[i]||0));
+      else out.push(prev);
+    }
+    return out;
+  }
+  function linreg(values) {
+    var n=values.length;
+    if (n<2) return { slope:0, intercept:values[0]||0, r2:0 };
+    var xMean=(n-1)/2, yMean=0;
+    for (var i=0;i<n;i++) yMean+=values[i]; yMean/=n;
+    var num=0, den=0;
+    for (var i=0;i<n;i++){ num += (i-xMean)*(values[i]-yMean); den += (i-xMean)*(i-xMean); }
+    var slope = den? num/den : 0, intercept = yMean-slope*xMean;
+    var ssRes=0, ssTot=0;
+    for (var i=0;i<n;i++){ var pred=slope*i+intercept; ssRes+=(values[i]-pred)*(values[i]-pred); ssTot+=(values[i]-yMean)*(values[i]-yMean); }
+    var r2 = ssTot? Math.max(0,1-ssRes/ssTot) : 0;
+    return { slope:slope, intercept:intercept, r2:r2 };
+  }
+  function supportResistance(closes, highs, lows, lookback) {
+    lookback = Math.min(lookback||60, closes.length);
+    var rh=highs.slice(-lookback).slice().sort(function(a,b){return b-a;});
+    var rl=lows.slice(-lookback).slice().sort(function(a,b){return a-b;});
+    function pick(arr,frac){ return arr[Math.min(arr.length-1,Math.max(0,Math.floor(arr.length*frac)))]; }
+    return { r2:pick(rh,0.04), r1:pick(rh,0.14), s1:pick(rl,0.14), s2:pick(rl,0.04) };
+  }
+
+  /* ============================== CONFLUENCE SCORING ============================== */
+  function buildConfluence(ind) {
+    var votes = [];
+    function vote(id, label, value, weight) { votes.push({ id:id, label:label, value:value, weight:weight }); }
+
+    if (ind.price!=null && ind.sma50!=null && ind.sma200!=null) {
+      var v=0; if (ind.price>ind.sma50 && ind.sma50>ind.sma200) v=1; else if (ind.price<ind.sma50 && ind.sma50<ind.sma200) v=-1;
+      vote('sma','Struktur SMA (Price/50/200)', v, 1);
+    }
+    if (ind.ema9!=null && ind.ema21!=null && ind.ema50!=null) {
+      var v=0; if (ind.ema9>ind.ema21 && ind.ema21>ind.ema50) v=1; else if (ind.ema9<ind.ema21 && ind.ema21<ind.ema50) v=-1;
+      vote('ema','Alignment EMA (9/21/50)', v, 1);
+    }
+    if (ind.rsi!=null) { var v=0; if(ind.rsi>55)v=1; else if(ind.rsi<45)v=-1; vote('rsi','Momentum RSI', v, 1); }
+    if (ind.macdHist!=null) vote('macd','MACD Histogram', ind.macdHist>0?1:ind.macdHist<0?-1:0, 1);
+    if (ind.stoch!=null) { var v=0; if(ind.stoch>55)v=1; else if(ind.stoch<45)v=-1; vote('stoch','Momentum Stochastic', v, 0.75); }
+    if (ind.price!=null && ind.bbMid!=null) vote('bb','Posisi vs Bollinger Mid', ind.price>ind.bbMid?1:ind.price<ind.bbMid?-1:0, 0.75);
+    if (ind.obvSlopeSign!=null) vote('obv','Trend Volume (OBV)', ind.obvSlopeSign, 0.75);
+    if (ind.trendSlopeSign!=null) vote('trendline','Garis Trend (Regresi Linear)', ind.trendSlopeSign, 1);
+
+    var maxScore = votes.reduce(function(s,v){return s+v.weight;},0);
+    var rawScore = votes.reduce(function(s,v){return s+v.value*v.weight;},0);
+    var norm10 = maxScore ? Math.round(((rawScore+maxScore)/(2*maxScore))*100)/10 : 5;
+    var rec = 'HOLD';
+    if (norm10>=6.5) rec='BUY'; else if (norm10<=3.5) rec='SELL';
+    return {
+      votes:votes, score:norm10, rec:rec,
+      bullCount: votes.filter(function(v){return v.value===1;}).length,
+      bearCount: votes.filter(function(v){return v.value===-1;}).length,
+      total: votes.length,
+    };
+  }
+
+  /* ============================== RISK PLAN (ATR-based) ============================== */
+  function buildRiskPlan(price, atrVal, rec) {
+    if (!price || !atrVal || atrVal<=0) return { available:false };
+    var riskDist = atrVal*1.5;
+    if (rec==='BUY') return { available:true, entryLow:price*0.99, entryHigh:price*1.01, sl:price-riskDist, tp1:price+riskDist*1.5, tp2:price+riskDist*2, rr:'1:1.5 / 1:2' };
+    if (rec==='SELL') return { available:true, entryLow:price*0.99, entryHigh:price*1.01, sl:price+riskDist, tp1:price-riskDist*1.5, tp2:price-riskDist*2, rr:'1:1.5 / 1:2' };
+    return { available:false };
+  }
+
+  /* ============================== DATA FETCH (Yahoo + fallback proxies) ============================== */
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })
+    ]);
+  }
+
+  function fetchOHLCV(sym) {
+    var yurl = "https://query1.finance.yahoo.com/v8/finance/chart/" + sym + ".JK?interval=1d&range=1y";
+    var attempts = [
+      { name:"Yahoo langsung", url: yurl },
+      { name:"Proxy 1", url: "https://corsproxy.io/?url=" + encodeURIComponent(yurl) },
+      { name:"Proxy 2", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yurl) },
+    ];
+
+    function tryOne(i) {
+      if (i >= attempts.length) return Promise.reject(new Error("ALL_FAILED"));
+      return withTimeout(fetch(attempts[i].url), 10000)
+        .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+        .then(function (j) {
+          var r = j && j.chart && j.chart.result && j.chart.result[0];
+          if (!r) throw new Error("empty");
+          var q = r.indicators.quote[0];
+          var c=[], h=[], l=[], v=[];
+          for (var k=0;k<q.close.length;k++) {
+            if (q.close[k]!=null && q.high[k]!=null && q.low[k]!=null) {
+              c.push(q.close[k]); h.push(q.high[k]); l.push(q.low[k]); v.push(q.volume[k]||0);
+            }
+          }
+          if (c.length < 30) throw new Error("insufficient");
+          var m = r.meta || {};
+          return { c:c, h:h, l:l, v:v, metaPrice: m.regularMarketPrice, metaPrev: m.chartPreviousClose || m.previousClose };
+        })
+        .catch(function (e) { return tryOne(i + 1); });
+    }
+    return tryOne(0);
+  }
+
+  /* ============================== RENDER HELPERS ============================== */
+  function chip(v, textOverride) {
+    if (v == null) return "";
+    var col = dC(v > 0 ? 1 : v < 0 ? -1 : 0);
+    var label = textOverride != null ? textOverride : (v > 0 ? "BULLISH" : v < 0 ? "BEARISH" : "NETRAL");
+    return '<span class="chip" style="color:' + col + ';background:' + col + '18;border:1px solid ' + col + '44">' + esc(label) + '</span>';
+  }
+  function chipText(text, sign) {
+    var col = dC(sign);
+    return '<span class="chip" style="color:' + col + ';background:' + col + '18;border:1px solid ' + col + '44">' + esc(text) + '</span>';
+  }
+  function irow(lbl, sign, text) {
+    if (sign == null) return "";
+    return '<div class="irow"><span class="irow-label">' + esc(lbl) + '</span>' + chipText(text, sign) + '</div>';
+  }
+  function gauge(label, val, sig, lo, hi) {
+    var pct = Math.min(100, Math.max(0, val));
+    var col = dC(sig);
+    return '' +
+      '<div class="gauge">' +
+        '<div class="gauge-top"><span class="gauge-label">' + esc(label) + '</span><span class="gauge-val" style="color:' + col + '">' + val.toFixed(1) + '</span></div>' +
+        '<div class="gauge-track">' +
+          '<div style="position:absolute;left:' + lo + '%;top:0;bottom:0;width:1px;background:' + C.green + '55"></div>' +
+          '<div style="position:absolute;left:' + hi + '%;top:0;bottom:0;width:1px;background:' + C.red + '55"></div>' +
+          '<div class="gauge-fill" style="width:' + pct + '%;background:' + col + ';box-shadow:0 0 8px ' + col + '66"></div>' +
+        '</div>' +
+        '<div class="gauge-thresh"><span style="color:' + C.green + '88">' + lo + '</span><span></span><span style="color:' + C.red + '88">' + hi + '</span></div>' +
+      '</div>';
+  }
+  function riskCard(icon, lbl, val, color) {
+    return '<div class="risk-card"><div class="risk-icon">' + icon + '</div><div class="risk-label">' + esc(lbl) + '</div><div class="risk-val" style="color:' + color + '">' + esc(val) + '</div></div>';
+  }
+
+  /* ============================== CANVAS CHART ============================== */
+  function drawChart(canvas, series) {
+    try {
+      var dpr = window.devicePixelRatio || 1;
+      var rect = canvas.getBoundingClientRect();
+      var w = Math.max(280, rect.width || 320), h = 220;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.height = h + "px";
+      var ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      var pad = { l: 8, r: 8, t: 12, b: 10 };
+      var plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+
+      var closes = series.closes, sma20 = series.sma20, sma50 = series.sma50, bbU = series.bbUpper, bbL = series.bbLower;
+      var n = closes.length;
+      if (n < 2) return;
+
+      var allVals = closes.concat(bbU.filter(function(x){return x!=null;})).concat(bbL.filter(function(x){return x!=null;}));
+      var maxV = Math.max.apply(null, allVals), minV = Math.min.apply(null, allVals);
+      if (!Number.isFinite(maxV) || !Number.isFinite(minV) || maxV === minV) { maxV = (maxV||1) * 1.05; minV = (minV||0) * 0.95; }
+      var range = maxV - minV || 1;
+      var padV = range * 0.08;
+      maxV += padV; minV -= padV; range = maxV - minV;
+
+      function xAt(i) { return pad.l + (i / (n - 1)) * plotW; }
+      function yAt(val) { return pad.t + (1 - (val - minV) / range) * plotH; }
+
+      function drawLine(arr, color, width, dashed) {
+        ctx.beginPath();
+        var started = false;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] == null) { started = false; continue; }
+          var x = xAt(i), y = yAt(arr[i]);
+          if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+        }
+        ctx.strokeStyle = color; ctx.lineWidth = width;
+        ctx.setLineDash(dashed ? [5, 4] : []);
+        ctx.lineJoin = "round"; ctx.lineCap = "round";
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Bollinger fill
+      if (bbU && bbL) {
+        ctx.beginPath();
+        var any = false;
+        for (var i = 0; i < n; i++) { if (bbU[i]==null) continue; var x=xAt(i), y=yAt(bbU[i]); if(!any){ctx.moveTo(x,y);any=true;} else ctx.lineTo(x,y); }
+        for (var i = n - 1; i >= 0; i--) { if (bbL[i]==null) continue; ctx.lineTo(xAt(i), yAt(bbL[i])); }
+        ctx.closePath();
+        ctx.fillStyle = C.cyan + "0d";
+        ctx.fill();
+        drawLine(bbU, C.cyan + "40", 1, true);
+        drawLine(bbL, C.cyan + "40", 1, true);
+      }
+
+      // S1 / R1 horizontal lines
+      if (series.s1 != null) { var y=yAt(series.s1); ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.strokeStyle=C.green+"70"; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]); }
+      if (series.r1 != null) { var y=yAt(series.r1); ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.strokeStyle=C.red+"70"; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]); }
+
+      // Regression trendline
+      if (series.regSlope != null && Number.isFinite(series.regSlope)) {
+        var p0 = series.regIntercept, p1 = series.regIntercept + series.regSlope * (n - 1);
+        ctx.beginPath();
+        ctx.moveTo(xAt(0), yAt(p0));
+        ctx.lineTo(xAt(n - 1), yAt(p1));
+        ctx.strokeStyle = C.green; ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]);
+        ctx.stroke(); ctx.setLineDash([]);
+      }
+
+      // SMA lines
+      drawLine(sma50, C.purple, 1.4, false);
+      drawLine(sma20, C.amber, 1.4, false);
+      // Price line (on top)
+      drawLine(closes, "#ffffff", 1.8, false);
+    } catch (e) {
+      // Fail silently — rest of the app must not break if canvas has an issue
+      try { canvas.replaceWith(Object.assign(document.createElement("div"), { textContent: "Chart tidak dapat ditampilkan.", style: "color:" + C.dim + ";font-size:11px;text-align:center;padding:20px;font-family:monospace;" })); } catch (e2) {}
+    }
+  }
+
+  /* ============================== RESULT RENDER ============================== */
+  var TAB_DEFS = [
+    ["trend","📈","Trend"], ["ema","➰","EMA"], ["momentum","⚡","Momentum"],
+    ["chart","🛠","Tools"], ["signal","🧮","Sinyal"]
+  ];
+
+  function renderResults(sym, D, activeTab) {
+    var rec = D.confluence.rec, score = D.confluence.score;
+    var recPair = recC(rec), recCol = recPair[0], recBg = recPair[1];
+    var html = "";
+
+    html += '<div class="hero">' +
+      '<div>' +
+        '<div class="hero-idx">IDX — ' + esc(sym) + '</div>' +
+        '<div class="hero-ticker">' + esc(sym) + '.JK</div>' +
+        '<div class="hero-co">Data OHLCV real · ' + D.dataPoints + ' hari perdagangan</div>' +
+        '<div class="hero-price-row">' +
+          '<span class="hero-price">' + idr(D.price) + '</span>' +
+          '<span class="hero-pct" style="color:' + (D.pct>=0?C.green:C.red) + '">' + (D.pct>=0?"▲":"▼") + ' ' + Math.abs(D.pct).toFixed(2) + '%</span>' +
+        '</div>' +
+        '<span class="price-badge" style="color:' + C.green + ';background:' + C.green + '18;border:1px solid ' + C.green + '44">✓ DATA REAL — NO AI</span>' +
+      '</div>' +
+      '<div class="hero-right">' +
+        '<div style="text-align:center">' +
+          '<div class="score-circle" style="border:3px solid ' + scC(score) + '">' +
+            '<span class="score-num" style="color:' + scC(score) + '">' + score.toFixed(1) + '</span>' +
+            '<span style="font-size:8px;color:' + C.dim + '">/10</span>' +
+          '</div>' +
+          '<div class="score-label">SKOR KONFLUENSI</div>' +
+        '</div>' +
+        '<div class="rec-box" style="background:' + recBg + ';border:2px solid ' + recCol + '">' +
+          '<div class="rec-text" style="color:' + recCol + '">' + esc(rec) + '</div>' +
+          '<div class="rec-label">REKOMENDASI</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div class="tabs">';
+    TAB_DEFS.forEach(function (t) {
+      html += '<button class="tab-btn' + (t[0]===activeTab?' active':'') + '" data-tab="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>';
+    });
+    html += '</div>';
+
+    if (activeTab === "trend") {
+      var tl = D.trendline;
+      html += '<div class="panel"><div class="panel-title">TREND — MOVING AVERAGE (SMA)</div>' +
+        '<div class="chip-row">' + chipText(D.cross, D.cross==="GOLDEN CROSS"?1:D.cross==="DEATH CROSS"?-1:0) + '</div>' +
+        irow("SMA20 (" + idr(D.sma20) + ")", D.price>D.sma20?1:-1, D.price>D.sma20?"ABOVE":"BELOW") +
+        irow("SMA50 (" + idr(D.sma50) + ")", D.price>D.sma50?1:-1, D.price>D.sma50?"ABOVE":"BELOW") +
+        irow("SMA200 (" + idr(D.sma200) + ")", D.sma200!=null ? (D.price>D.sma200?1:-1) : null, D.price>D.sma200?"ABOVE":"BELOW") +
+      '</div>';
+      html += '<div class="panel"><div class="panel-title">GARIS TREND (LINEAR REGRESSION, 20 HARI)</div>' +
+        '<div class="chip-row">' + chipText(tl.label, tl.sign) + '</div>' +
+        '<p class="desc">Kemiringan garis: ' + (tl.slopePctPerDay>=0?"+":"") + tl.slopePctPerDay.toFixed(2) + '%/hari. R² = ' + tl.r2.toFixed(2) + ' (' + (tl.r2>0.7?"trend cukup bersih":tl.r2>0.4?"trend sedang, agak choppy":"pergerakan tidak searah / sideways") + '). Garis ini dihitung matematis dari 20 harga penutupan terakhir, bukan perkiraan.</p>' +
+      '</div>';
+    } else if (activeTab === "ema") {
+      html += '<div class="panel"><div class="panel-title">EXPONENTIAL MOVING AVERAGE (EMA)</div>' +
+        '<div class="chip-row">' + chipText(D.emaAlign.label, D.emaAlign.sign) + '</div>' +
+        irow("EMA9 (" + idr(D.ema9) + ")", D.price>D.ema9?1:-1, D.price>D.ema9?"ABOVE":"BELOW") +
+        irow("EMA21 (" + idr(D.ema21) + ")", D.price>D.ema21?1:-1, D.price>D.ema21?"ABOVE":"BELOW") +
+        irow("EMA50 (" + idr(D.ema50) + ")", D.price>D.ema50?1:-1, D.price>D.ema50?"ABOVE":"BELOW") +
+        '<div class="ema-note">💡 EMA memberi bobot lebih besar ke harga terbaru sehingga lebih cepat merespons perubahan dibanding SMA — cocok untuk sinyal entry/exit lebih awal di swing trading jangka pendek.</div>' +
+      '</div>';
+    } else if (activeTab === "momentum") {
+      html += '<div class="panel"><div class="panel-title">MOMENTUM</div>' +
+        gauge("RSI (14)", D.rsi, D.rsi<30?-1:D.rsi>70?1:0, 30, 70) +
+        gauge("Stochastic %K (14)", D.stoch, D.stoch<20?-1:D.stoch>80?1:0, 20, 80) +
+        irow("MACD Histogram (" + D.macdHist.toFixed(1) + ")", D.macdHist>0?1:-1, D.macdHist>0?"BULLISH":"BEARISH") +
+        irow("Volume vs rata-rata 20 hari", D.volSign, D.volSign>0?"DI ATAS RATA-RATA":D.volSign<0?"DI BAWAH RATA-RATA":"NORMAL") +
+      '</div>';
+    } else if (activeTab === "chart") {
+      html += '<div class="panel"><div class="panel-title">GRAFIK HARGA + TREND LINE (90 HARI)</div>' +
+        '<canvas id="priceChart"></canvas>' +
+        '<div class="legend">' +
+          '<span><i style="background:#fff"></i>Harga</span>' +
+          '<span><i style="background:' + C.amber + '"></i>SMA20</span>' +
+          '<span><i style="background:' + C.purple + '"></i>SMA50</span>' +
+          '<span><i style="background:' + C.cyan + '"></i>Bollinger</span>' +
+          '<span><i style="background:' + C.green + '"></i>Garis Trend</span>' +
+        '</div>' +
+        '<div class="panel-title">VOLATILITAS</div>' +
+        irow("Posisi vs Bollinger Bands", D.price>D.bb.mid?1:-1, "%B = " + (D.bb.pctB*100).toFixed(0) + "%") +
+        '<p class="desc">ATR(14): ' + idr(D.atr) + ' — estimasi pergerakan harga harian wajar. Dipakai untuk hitung Stop Loss otomatis di bawah, bukan angka persentase asal tebak.</p>' +
+      '</div>';
+      html += '<div class="panel"><div class="panel-title">SUPPORT & RESISTANCE</div>';
+      [["R2",D.sr.r2,C.red,false],["R1",D.sr.r1,"#ff8099",false],["● NOW",D.price,C.text,true],["S1",D.sr.s1,"#66ffaa",false],["S2",D.sr.s2,C.green,false]].forEach(function(row){
+        html += '<div class="sr-row"><span class="sr-tag" style="color:'+row[2]+';background:'+(row[3]?"transparent":row[2]+"18")+'">'+row[0]+'</span><span class="sr-val" style="font-size:'+(row[3]?"14.5px":"12.5px")+';font-weight:'+(row[3]?"900":"700")+';color:'+row[2]+'">'+idr(row[1])+'</span></div>';
+      });
+      html += '</div>';
+      if (D.fib) {
+        html += '<div class="panel"><div class="panel-title">FIBONACCI RETRACEMENT (52W)</div>';
+        [["High 52W",D.fib.h52],["Fib 23.6%",D.fib.f236],["Fib 38.2%",D.fib.f382],["Fib 50.0%",D.fib.f50],["Fib 61.8%",D.fib.f618],["Low 52W",D.fib.l52]].forEach(function(row){
+          html += '<div class="fib-row"><span style="color:'+C.muted+'">'+row[0]+'</span><span style="color:'+C.text+';font-weight:700">'+idr(row[1])+'</span></div>';
+        });
+        html += '</div>';
+      }
+    } else if (activeTab === "signal") {
+      var conf = D.confluence;
+      html += '<div class="panel"><div class="panel-title">🧮 SINYAL KONFLUENSI — ' + conf.total + ' INDIKATOR</div>' +
+        '<p class="desc">Konfluensi berarti menggabungkan beberapa indikator independen dan melihat apakah mereka SEPAKAT. Ini teknik trading standar untuk mengurangi sinyal palsu dari 1 indikator saja — bukan alat prediksi pasti. ' + conf.bullCount + ' dari ' + conf.total + ' indikator bullish, ' + conf.bearCount + ' bearish.</p>' +
+        '<div class="score-bar-wrap">' +
+          '<div class="score-bar-track"><div class="score-bar-fill" style="width:' + (conf.score*10) + '%;background:' + scC(conf.score) + '"></div></div>' +
+          '<div class="score-bar-labels"><span>0 — Sangat Bearish</span><span>5 — Netral</span><span>10 — Sangat Bullish</span></div>' +
+        '</div>' +
+        '<table class="vote-table">';
+      conf.votes.forEach(function (v) {
+        var label = v.value===1 ? "BULLISH ▲" : v.value===-1 ? "BEARISH ▼" : "NETRAL —";
+        html += '<tr><td class="vote-label">' + esc(v.label) + '</td><td class="vote-mark" style="color:' + dC(v.value) + '">' + label + '</td></tr>';
+      });
+      html += '</table></div>';
+    }
+
+    html += '<div class="risk-panel"><div class="panel-title">💼 MANAJEMEN RISIKO — BERBASIS ATR(14)</div>';
+    if (D.risk.available) {
+      html += '<div class="risk-grid">' +
+        riskCard("📍","ENTRY", idr(D.risk.entryLow)+" – "+idr(D.risk.entryHigh), C.cyan) +
+        riskCard("🎯","TP1", idr(D.risk.tp1), C.green) +
+        riskCard("🎯","TP2", idr(D.risk.tp2), "#00cc60") +
+        riskCard("🛑","STOP LOSS", idr(D.risk.sl), C.red) +
+        riskCard("⚖️","RISK/REWARD", D.risk.rr, C.purple) +
+        riskCard("📏","ATR(14)", idr(D.atr), C.amber) +
+      '</div>' +
+      '<p class="desc" style="margin-top:12px;margin-bottom:0">SL & TP dihitung dari volatilitas real (ATR), bukan persentase asal tebak — jarak SL = 1.5× ATR dari harga saat ini.</p>';
+    } else {
+      html += '<p class="desc" style="margin:0">Sinyal saat ini <b style="color:' + C.amber + '">HOLD/netral</b> — indikator belum sepakat satu arah. Trading tanpa arah jelas berisiko tinggi; disiplin terbaik adalah menunggu konfirmasi sebelum entry.</p>';
+    }
+    html += '</div>';
+
+    if (D.risks.length || D.cats.length) {
+      html += '<div class="two-col">';
+      if (D.risks.length) {
+        html += '<div class="panel" style="border-color:' + C.red + '33"><div class="list-panel-title" style="color:' + C.red + '">⚠ PERHATIAN</div>';
+        D.risks.forEach(function (r) { html += '<div class="list-item"><span class="bullet" style="color:' + C.red + '">▸</span><span style="color:#fca5a5">' + esc(r) + '</span></div>'; });
+        html += '</div>';
+      }
+      if (D.cats.length) {
+        html += '<div class="panel" style="border-color:' + C.green + '33"><div class="list-panel-title" style="color:' + C.green + '">✓ KONFIRMASI</div>';
+        D.cats.forEach(function (c) { html += '<div class="list-item"><span class="bullet" style="color:' + C.green + '">▸</span><span style="color:#86efac">' + esc(c) + '</span></div>'; });
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<div class="disclaimer">⚠ Semua angka dihitung otomatis dari data harga historis real (Yahoo Finance). Ini BUKAN rekomendasi investasi dan BUKAN jaminan prediksi akurat — indikator teknikal membaca pola masa lalu, bukan meramal masa depan. Selalu DYOR.</div>';
+
+    return html;
+  }
+
+  function buildAnalysis(sym, raw, manualPrice) {
+    var c = raw.c, h = raw.h, l = raw.l, v = raw.v;
+    var price = manualPrice || raw.metaPrice || c[c.length - 1];
+    var prev = raw.metaPrev || c[c.length - 2] || price;
+    var pct = prev ? ((price - prev) / prev) * 100 : 0;
+
+    var sma20 = sma(c, 20), sma50 = sma(c, 50), sma200 = sma(c, 200);
+    var ema9 = emaLast(c, 9), ema21 = emaLast(c, 21), ema50 = emaLast(c, 50);
+    var rsiV = rsi(c), macdV = macd(c), stochV = stochastic(c, h, l);
+    var bb = bollinger(c, 20, 2);
+    var atrV = atr(c, h, l, 14);
+    var obv = obvSeries(c, v);
+    var obvRecent = obv.slice(-20);
+    var obvTrend = linreg(obvRecent);
+    var obvSlopeSign = Math.abs(obvTrend.slope) < 1e-9 ? 0 : (obvTrend.slope > 0 ? 1 : -1);
+
+    var last20 = c.slice(-20);
+    var reg = linreg(last20);
+    var avgPrice20 = last20.reduce(function(a,b){return a+b;},0) / last20.length;
+    var slopePctPerDay = avgPrice20 ? (reg.slope / avgPrice20) * 100 : 0;
+    var trendSign = slopePctPerDay > 0.15 ? 1 : slopePctPerDay < -0.15 ? -1 : 0;
+    var trendLabel = trendSign > 0 ? "UPTREND" : trendSign < 0 ? "DOWNTREND" : "SIDEWAYS";
+
+    var sr = supportResistance(c, h, l, 60);
+    var recentH = h.slice(-252), recentL = l.slice(-252);
+    var h52 = Math.max.apply(null, recentH), l52 = Math.min.apply(null, recentL);
+    var fib = null;
+    if (h52 > l52) {
+      var rng = h52 - l52;
+      fib = { h52:h52, l52:l52, f236:h52-rng*0.236, f382:h52-rng*0.382, f50:h52-rng*0.5, f618:h52-rng*0.618 };
+    }
+
+    var avgVol = v.slice(-20).reduce(function(a,b){return a+b;},0) / Math.min(20, v.length);
+    var curVol = v[v.length - 1] || 0;
+    var volSign = !avgVol ? 0 : curVol > avgVol * 1.3 ? 1 : curVol < avgVol * 0.7 ? -1 : 0;
+
+    var cross = (sma50 && sma200) ? (sma50 > sma200 ? "GOLDEN CROSS" : "DEATH CROSS") : "DATA TIDAK CUKUP";
+    var emaAlignSign = (ema9 > ema21 && ema21 > ema50) ? 1 : (ema9 < ema21 && ema21 < ema50) ? -1 : 0;
+    var emaAlign = { sign: emaAlignSign, label: emaAlignSign>0?"BULLISH ALIGNMENT":emaAlignSign<0?"BEARISH ALIGNMENT":"MIXED" };
+
+    var confluence = buildConfluence({
+      price: price, sma50: sma50, sma200: sma200, ema9: ema9, ema21: ema21, ema50: ema50,
+      rsi: rsiV, macdHist: macdV.hist, stoch: stochV, bbMid: bb ? bb.mid : null,
+      obvSlopeSign: obvSlopeSign, trendSlopeSign: trendSign,
+    });
+    var risk = buildRiskPlan(price, atrV, confluence.rec);
+
+    var risks = [], cats = [];
+    if (rsiV > 70) risks.push("RSI overbought (" + rsiV.toFixed(0) + ") — risiko koreksi jangka pendek meningkat.");
+    if (rsiV < 30) cats.push("RSI oversold (" + rsiV.toFixed(0) + ") — area historis rawan technical rebound.");
+    if (cross === "DEATH CROSS") risks.push("SMA50 di bawah SMA200 (Death Cross) — trend besar masih lemah.");
+    if (cross === "GOLDEN CROSS") cats.push("SMA50 di atas SMA200 (Golden Cross) — struktur trend besar mendukung.");
+    if (volSign > 0 && confluence.rec === "BUY") cats.push("Volume di atas rata-rata mengonfirmasi minat beli.");
+    if (volSign < 0) risks.push("Volume di bawah rata-rata — pergerakan harga kurang didukung partisipasi pasar.");
+    if (bb && bb.pctB > 1) risks.push("Harga di atas Bollinger upper band — kondisi overextended jangka pendek.");
+    if (bb && bb.pctB < 0) cats.push("Harga di bawah Bollinger lower band — area historis rawan pantulan.");
+
+    var chartN = Math.min(90, c.length);
+    var chartCloses = c.slice(-chartN);
+    var chartSma20 = smaSeries(c, 20).slice(-chartN);
+    var chartSma50 = smaSeries(c, 50).slice(-chartN);
+    var bbSeriesU = [], bbSeriesL = [];
+    for (var i = c.length - chartN; i < c.length; i++) {
+      var win = c.slice(Math.max(0, i - 19), i + 1);
+      var bbw = bollinger(win, Math.min(20, win.length), 2);
+      bbSeriesU.push(bbw ? bbw.upper : null);
+      bbSeriesL.push(bbw ? bbw.lower : null);
+    }
+    var chartReg = linreg(chartCloses.slice(-20));
+
+    return {
+      price: price, pct: pct, dataPoints: c.length,
+      sma20: sma20, sma50: sma50, sma200: sma200, cross: cross,
+      ema9: ema9, ema21: ema21, ema50: ema50, emaAlign: emaAlign,
+      rsi: rsiV, stoch: stochV, macdHist: macdV.hist, volSign: volSign,
+      bb: bb, atr: atrV, sr: sr, fib: fib,
+      trendline: { sign: trendSign, label: trendLabel, slopePctPerDay: slopePctPerDay, r2: reg.r2 },
+      confluence: confluence, risk: risk, risks: risks, cats: cats,
+      chart: { closes: chartCloses, sma20: chartSma20, sma50: chartSma50, bbUpper: bbSeriesU, bbLower: bbSeriesL,
+        regSlope: chartReg.slope, regIntercept: chartCloses[chartCloses.length - 20] != null ? null : null,
+        s1: sr.s1, r1: sr.r1 },
+    };
+  }
+
+  /* ============================== APP WIRING ============================== */
+  var tickerInput = document.getElementById("tickerInput");
+  var analyzeBtn = document.getElementById("analyzeBtn");
+  var loadingBox = document.getElementById("loadingBox");
+  var loadingTitle = document.getElementById("loadingTitle");
+  var errorBox = document.getElementById("errorBox");
+  var errorMsg = document.getElementById("errorMsg");
+  var retryBtn = document.getElementById("retryBtn");
+  var resultsBox = document.getElementById("resultsBox");
+
+  var lastSym = "", lastD = null, activeTab = "trend";
+
+  tickerInput.addEventListener("input", function () { tickerInput.value = tickerInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+  tickerInput.addEventListener("keydown", function (e) { if (e.key === "Enter") run(); });
+  analyzeBtn.addEventListener("click", run);
+  retryBtn.addEventListener("click", run);
+
+  function setStep(n) {
+    document.querySelectorAll(".step").forEach(function (el) {
+      var idx = Number(el.getAttribute("data-step"));
+      el.classList.remove("done", "active");
+      var mark = el.querySelector(".mark");
+      if (idx < n) { el.classList.add("done"); mark.textContent = "✓"; }
+      else if (idx === n) { el.classList.add("active"); mark.textContent = "▶"; }
+      else { mark.textContent = "○"; }
+    });
+  }
+
+  function run() {
+    var raw = tickerInput.value.trim();
+    if (!raw || analyzeBtn.disabled) return;
+    var sym = raw.toUpperCase().replace(/\.JK$/i, "");
+
+    analyzeBtn.disabled = true; analyzeBtn.textContent = "LOADING…";
+    errorBox.classList.add("hidden"); resultsBox.classList.add("hidden");
+    loadingBox.classList.remove("hidden");
+    loadingTitle.textContent = "■ MENGANALISA " + sym + " ■";
+    setStep(0);
+
+    fetchOHLCV(sym).then(function (ohlcv) {
+      setStep(1);
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          setStep(2);
+          var D = buildAnalysis(sym, ohlcv, null);
+          resolve(D);
+        }, 250);
+      });
+    }).then(function (D) {
+      lastSym = sym; lastD = D; activeTab = "trend";
+      resultsBox.innerHTML = renderResults(sym, D, activeTab);
+      resultsBox.classList.remove("hidden");
+      wireTabs();
+      var canvas = document.getElementById("priceChart");
+      if (canvas) drawChart(canvas, {
+        closes: D.chart.closes, sma20: D.chart.sma20, sma50: D.chart.sma50,
+        bbUpper: D.chart.bbUpper, bbLower: D.chart.bbLower,
+        regSlope: D.trendline ? (D.chart.regSlope) : null,
+        regIntercept: computeRegIntercept(D.chart.closes),
+        s1: D.chart.s1, r1: D.chart.r1,
+      });
+    }).catch(function (e) {
+      var msg = (e && e.message === "ALL_FAILED")
+        ? "Tidak bisa mengambil data historis untuk " + sym + ".JK dari semua sumber (Yahoo Finance + 2 proxy cadangan).\n\nKemungkinan penyebab:\n• Koneksi internet sedang bermasalah\n• Kode saham salah/tidak terdaftar di IDX\n• Jaringan tempat kamu membuka halaman ini memblokir akses ke Yahoo Finance\n\nCoba: refresh halaman, ganti jaringan (WiFi ↔ data seluler), atau coba lagi dalam beberapa menit."
+        : "Terjadi kesalahan: " + ((e && e.message) || "unknown") + "\n\nCoba lagi dalam beberapa saat.";
+      errorMsg.textContent = msg;
+      errorBox.classList.remove("hidden");
+    }).finally(function () {
+      loadingBox.classList.add("hidden");
+      analyzeBtn.disabled = false; analyzeBtn.textContent = "ANALISA →";
+    });
+  }
+
+  function computeRegIntercept(closes) {
+    var last20 = closes.slice(-20);
+    var n = last20.length;
+    if (n < 2) return last20[0] || 0;
+    var xMean=(n-1)/2, yMean=0;
+    for (var i=0;i<n;i++) yMean+=last20[i]; yMean/=n;
+    var num=0, den=0;
+    for (var i=0;i<n;i++){ num+=(i-xMean)*(last20[i]-yMean); den+=(i-xMean)*(i-xMean); }
+    var slope = den?num/den:0;
+    return yMean - slope*xMean;
+  }
+
+  function wireTabs() {
+    resultsBox.querySelectorAll(".tab-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        activeTab = btn.getAttribute("data-tab");
+        resultsBox.innerHTML = renderResults(lastSym, lastD, activeTab);
+        wireTabs();
+        if (activeTab === "chart") {
+          var canvas = document.getElementById("priceChart");
+          if (canvas) drawChart(canvas, {
+            closes: lastD.chart.closes, sma20: lastD.chart.sma20, sma50: lastD.chart.sma50,
+            bbUpper: lastD.chart.bbUpper, bbLower: lastD.chart.bbLower,
+            regSlope: lastD.chart.regSlope, regIntercept: computeRegIntercept(lastD.chart.closes),
+            s1: lastD.chart.s1, r1: lastD.chart.r1,
+          });
+        }
+      });
+    });
+  }
+
+  // Register service worker for installability (best-effort, must not block the app)
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js").catch(function () { /* non-fatal */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
