@@ -1,0 +1,26 @@
+{
+  "background_color": "#ffffff",
+  "description": "Analisis teknikal saham IDX: SMA, EMA, RSI, MACD, Bollinger, ATR, OBV, trend line, dan sinyal konfluensi — 100% dihitung dari data real, tanpa AI.",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "trade el",
+  "orientation": "any",
+  "scope": "/https://chenli-wang.github.io/trade-app-el/",
+  "short_name": "ael",
+  "start_url": "/https://chenli-wang.github.io/trade-app-el/",
+  "theme_color": "#060f1a",
+  "icons": [
+    {
+      "src": "https://chenli-wang.github.io/trade-app-el/icons/icon-192.png",
+      "isSquare": false,
+      "isPng": true,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 0,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    }
+  ],
+  "id": "farel"
+}
