@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#060f1a">
 <meta name="description" content="Analisis teknikal saham IDX: SMA, EMA, RSI, MACD, Bollinger, ATR, OBV, trend line, dan sinyal konfluensi — 100% dihitung dari data real, tanpa AI.">
 <link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./icon-192.png">
-<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <style>
   :root {
     --bg:#060f1a; --surf:#0a1828; --card:#0d2040; --bdr:#143058;
@@ -62,17 +62,42 @@
   .hero { background:linear-gradient(135deg, var(--card), var(--surf)); border:1px solid var(--bdr); border-radius:20px;
     padding:20px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:flex-start; }
   .hero-idx { font-size:10px; color:var(--cyan); letter-spacing:5px; font-family:monospace; margin-bottom:4px; }
+  .hero-ticker-row { display:flex; align-items:center; gap:8px; }
   .hero-ticker { font-size:24px; font-weight:900; color:var(--text); font-family:monospace; letter-spacing:-1px; }
+  .star-btn { background:none; border:none; font-size:22px; line-height:1; cursor:pointer; color:var(--dim); padding:0 2px; }
+  .star-btn.active { color:var(--amber); }
   .hero-co { font-size:12.5px; color:var(--muted); margin:3px 0 10px; }
   .hero-price-row { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
-  .hero-price { font-size:22px; font-weight:900; color:var(--text); font-family:monospace; }
+  .hero-price { font-size:22px; font-weight:900; color:var(--text); font-family:monospace; transition:color .3s; }
   .hero-pct { font-size:12.5px; font-weight:700; font-family:monospace; }
-  .price-badge { display:inline-block; margin-top:7px; font-size:9.5px; font-family:monospace; padding:2px 9px; border-radius:7px; }
+  .badge-row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:7px; }
+  .price-badge { display:inline-block; font-size:9.5px; font-family:monospace; padding:2px 9px; border-radius:7px; }
+  .live-toggle { font-size:9.5px; font-family:monospace; padding:2px 9px; border-radius:7px; border:1px solid var(--bdr);
+    background:var(--surf); color:var(--muted); cursor:pointer; }
+  .live-toggle.on { border-color:var(--green); color:var(--green); background:#00ff8014; }
+  .live-toggle.on .dot { animation:pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   .hero-right { display:flex; gap:10px; align-items:center; }
   .score-circle { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     flex-direction:column; background:var(--bg); }
   .score-num { font-size:19px; font-weight:900; font-family:monospace; }
   .score-label { font-size:8.5px; color:var(--dim); margin-top:4px; letter-spacing:1.5px; text-align:center; }
+
+  .perf-strip { display:grid; grid-template-columns:1fr 1fr 1fr 1.4fr; gap:8px; margin-bottom:10px; }
+  .perf-cell { background:var(--card); border:1px solid var(--bdr); border-radius:12px; padding:9px 6px; text-align:center; }
+  .perf-lbl { font-size:8.5px; color:var(--dim); letter-spacing:1px; margin-bottom:4px; }
+  .perf-val { font-size:12.5px; font-weight:900; font-family:monospace; }
+
+  .watchlist-strip { display:flex; gap:7px; overflow-x:auto; padding-bottom:2px; margin-bottom:12px; -webkit-overflow-scrolling:touch; }
+  .watchlist-strip:empty { display:none; margin:0; }
+  .wl-chip { flex-shrink:0; background:var(--card); border:1px solid var(--bdr); border-radius:11px; padding:7px 12px;
+    cursor:pointer; text-align:left; min-width:84px; }
+  .wl-chip.current { border-color:var(--cyan); }
+  .wl-chip-sym { font-size:11px; font-weight:900; font-family:monospace; color:var(--text); }
+  .wl-chip-px { font-size:10px; font-family:monospace; color:var(--muted); margin-top:2px; }
+  .wl-chip-pct { font-size:9.5px; font-family:monospace; font-weight:700; }
+  .wl-chip-remove { float:right; color:var(--dim); font-size:12px; margin-left:6px; }
+
   .rec-box { padding:12px 20px; border-radius:14px; text-align:center; }
   .rec-text { font-size:20px; font-weight:900; font-family:monospace; letter-spacing:2px; }
   .rec-label { font-size:8.5px; color:var(--dim); letter-spacing:2px; margin-top:3px; }
@@ -279,12 +304,56 @@
     var r2 = ssTot? Math.max(0,1-ssRes/ssTot) : 0;
     return { slope:slope, intercept:intercept, r2:r2 };
   }
-  function supportResistance(closes, highs, lows, lookback) {
-    lookback = Math.min(lookback||60, closes.length);
-    var rh=highs.slice(-lookback).slice().sort(function(a,b){return b-a;});
-    var rl=lows.slice(-lookback).slice().sort(function(a,b){return a-b;});
-    function pick(arr,frac){ return arr[Math.min(arr.length-1,Math.max(0,Math.floor(arr.length*frac)))]; }
-    return { r2:pick(rh,0.04), r1:pick(rh,0.14), s1:pick(rl,0.14), s2:pick(rl,0.04) };
+  // Real swing-point (fractal) detection: a bar is a swing high if its high exceeds the
+  // highs of `wing` bars on both sides (classic pivot/fractal definition traders use by hand).
+  // Nearby swing levels get merged into zones and ranked by how many times price reacted
+  // there — more touches = a level other traders are more likely watching too.
+  function findSwingPoints(highs, lows, wing) {
+    wing = wing || 3;
+    var swingHighs=[], swingLows=[];
+    for (var i=wing;i<highs.length-wing;i++) {
+      var isHigh=true, isLow=true;
+      for (var k=1;k<=wing;k++) {
+        if (highs[i]<=highs[i-k] || highs[i]<=highs[i+k]) isHigh=false;
+        if (lows[i]>=lows[i-k] || lows[i]>=lows[i+k]) isLow=false;
+      }
+      if (isHigh) swingHighs.push(highs[i]);
+      if (isLow) swingLows.push(lows[i]);
+    }
+    return { swingHighs:swingHighs, swingLows:swingLows };
+  }
+  function clusterLevels(levels, clusterPct) {
+    if (!levels.length) return [];
+    var sorted = levels.slice().sort(function(a,b){return a-b;});
+    var clusters=[], current=[sorted[0]];
+    for (var i=1;i<sorted.length;i++) {
+      var last=current[current.length-1];
+      if ((sorted[i]-last)/last <= clusterPct) current.push(sorted[i]);
+      else { clusters.push(current); current=[sorted[i]]; }
+    }
+    clusters.push(current);
+    return clusters.map(function(c){
+      var sum=0; for (var j=0;j<c.length;j++) sum+=c[j];
+      return { price: sum/c.length, touches: c.length };
+    }).sort(function(a,b){return b.touches-a.touches;});
+  }
+  function supportResistance(closes, highs, lows, price, lookback) {
+    lookback = Math.min(lookback||120, closes.length);
+    var h=highs.slice(-lookback), l=lows.slice(-lookback);
+    var sw = findSwingPoints(h, l, 3);
+    var resC = clusterLevels(sw.swingHighs.filter(function(v){return v>price;}), 0.015);
+    var supC = clusterLevels(sw.swingLows.filter(function(v){return v<price;}), 0.015);
+    var aboveH = h.filter(function(v){return v>price;});
+    var belowL = l.filter(function(v){return v<price;});
+    var r1 = resC[0] ? resC[0].price : (aboveH.length ? Math.min.apply(null,aboveH) : Math.max.apply(null,h));
+    var r2 = resC[1] ? resC[1].price : Math.max.apply(null,h);
+    var s1 = supC[0] ? supC[0].price : (belowL.length ? Math.max.apply(null,belowL) : Math.min.apply(null,l));
+    var s2 = supC[1] ? supC[1].price : Math.min.apply(null,l);
+    return {
+      r1:r1, r2:Math.max(r1,r2), s1:s1, s2:Math.min(s1,s2),
+      r1Touches: resC[0] ? resC[0].touches : 1,
+      s1Touches: supC[0] ? supC[0].touches : 1,
+    };
   }
 
   /* ============================== CONFLUENCE SCORING ============================== */
@@ -337,36 +406,75 @@
     ]);
   }
 
-  function fetchOHLCV(sym) {
-    var yurl = "https://query1.finance.yahoo.com/v8/finance/chart/" + sym + ".JK?interval=1d&range=1y";
+  // Shared fallback chain: tries Yahoo direct (2 hosts) then 3 CORS proxies, in order.
+  function fetchWithFallback(buildUrlFn, timeoutMs) {
+    var y1 = buildUrlFn("query1"), y2 = buildUrlFn("query2");
     var attempts = [
-      { name:"Yahoo langsung", url: yurl },
-      { name:"Proxy 1", url: "https://corsproxy.io/?url=" + encodeURIComponent(yurl) },
-      { name:"Proxy 2", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(yurl) },
+      { name:"Yahoo (query1)", url: y1 },
+      { name:"Yahoo (query2)", url: y2 },
+      { name:"Proxy — corsproxy.io", url: "https://corsproxy.io/?url=" + encodeURIComponent(y1) },
+      { name:"Proxy — allorigins", url: "https://api.allorigins.win/raw?url=" + encodeURIComponent(y1) },
+      { name:"Proxy — codetabs", url: "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(y1) },
     ];
-
+    var attemptLog = [];
     function tryOne(i) {
-      if (i >= attempts.length) return Promise.reject(new Error("ALL_FAILED"));
-      return withTimeout(fetch(attempts[i].url), 10000)
+      if (i >= attempts.length) {
+        var err = new Error("ALL_FAILED");
+        err.log = attemptLog;
+        return Promise.reject(err);
+      }
+      return withTimeout(fetch(attempts[i].url), timeoutMs || 10000)
         .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
         .then(function (j) {
-          var r = j && j.chart && j.chart.result && j.chart.result[0];
-          if (!r) throw new Error("empty");
-          var q = r.indicators.quote[0];
-          var c=[], h=[], l=[], v=[];
-          for (var k=0;k<q.close.length;k++) {
-            if (q.close[k]!=null && q.high[k]!=null && q.low[k]!=null) {
-              c.push(q.close[k]); h.push(q.high[k]); l.push(q.low[k]); v.push(q.volume[k]||0);
-            }
-          }
-          if (c.length < 30) throw new Error("insufficient");
-          var m = r.meta || {};
-          return { c:c, h:h, l:l, v:v, metaPrice: m.regularMarketPrice, metaPrev: m.chartPreviousClose || m.previousClose };
+          attemptLog.push({ source: attempts[i].name, ok: true });
+          return j;
         })
-        .catch(function (e) { return tryOne(i + 1); });
+        .catch(function (e) {
+          attemptLog.push({ source: attempts[i].name, ok: false, reason: (e && e.message) || String(e) });
+          return tryOne(i + 1);
+        });
     }
     return tryOne(0);
   }
+
+  function fetchOHLCV(sym) {
+    return fetchWithFallback(function (host) {
+      return "https://" + host + ".finance.yahoo.com/v8/finance/chart/" + sym + ".JK?interval=1d&range=1y";
+    }, 10000).then(function (j) {
+      var r = j && j.chart && j.chart.result && j.chart.result[0];
+      if (!r) throw new Error("respons kosong/format tak dikenal");
+      var q = r.indicators.quote[0];
+      var c=[], h=[], l=[], v=[];
+      for (var k=0;k<q.close.length;k++) {
+        if (q.close[k]!=null && q.high[k]!=null && q.low[k]!=null) {
+          c.push(q.close[k]); h.push(q.high[k]); l.push(q.low[k]); v.push(q.volume[k]||0);
+        }
+      }
+      if (c.length < 30) throw new Error("data tidak cukup (" + c.length + " hari)");
+      var m = r.meta || {};
+      return { c:c, h:h, l:l, v:v, metaPrice: m.regularMarketPrice, metaPrev: m.chartPreviousClose || m.previousClose };
+    });
+  }
+
+  // Lightweight quote: small 5-day range, just enough for price + % change.
+  // Used for the watchlist strip and the auto-update ticker so we're not re-downloading
+  // a full year of data every 30 seconds.
+  function fetchQuoteLight(sym) {
+    return fetchWithFallback(function (host) {
+      return "https://" + host + ".finance.yahoo.com/v8/finance/chart/" + sym + ".JK?interval=1d&range=5d";
+    }, 8000).then(function (j) {
+      var r = j && j.chart && j.chart.result && j.chart.result[0];
+      if (!r) throw new Error("respons kosong");
+      var m = r.meta || {};
+      var q = r.indicators.quote[0];
+      var closes = (q.close || []).filter(function (x) { return x != null; });
+      var price = m.regularMarketPrice != null ? m.regularMarketPrice : closes[closes.length - 1];
+      var prev = m.chartPreviousClose || m.previousClose || closes[closes.length - 2] || price;
+      if (price == null) throw new Error("harga tidak tersedia");
+      return { price: price, pct: prev ? ((price - prev) / prev) * 100 : 0 };
+    });
+  }
+
 
   /* ============================== RENDER HELPERS ============================== */
   function chip(v, textOverride) {
@@ -492,18 +600,25 @@
   function renderResults(sym, D, activeTab) {
     var rec = D.confluence.rec, score = D.confluence.score;
     var recPair = recC(rec), recCol = recPair[0], recBg = recPair[1];
+    var inWatchlist = isInWatchlist(sym);
     var html = "";
 
     html += '<div class="hero">' +
       '<div>' +
         '<div class="hero-idx">IDX — ' + esc(sym) + '</div>' +
-        '<div class="hero-ticker">' + esc(sym) + '.JK</div>' +
+        '<div class="hero-ticker-row">' +
+          '<span class="hero-ticker">' + esc(sym) + '.JK</span>' +
+          '<button class="star-btn' + (inWatchlist?' active':'') + '" id="starBtn" title="Simpan ke watchlist">' + (inWatchlist?'★':'☆') + '</button>' +
+        '</div>' +
         '<div class="hero-co">Data OHLCV real · ' + D.dataPoints + ' hari perdagangan</div>' +
         '<div class="hero-price-row">' +
-          '<span class="hero-price">' + idr(D.price) + '</span>' +
-          '<span class="hero-pct" style="color:' + (D.pct>=0?C.green:C.red) + '">' + (D.pct>=0?"▲":"▼") + ' ' + Math.abs(D.pct).toFixed(2) + '%</span>' +
+          '<span class="hero-price" id="livePrice">' + idr(D.price) + '</span>' +
+          '<span class="hero-pct" id="livePct" style="color:' + (D.pct>=0?C.green:C.red) + '">' + (D.pct>=0?"▲":"▼") + ' ' + Math.abs(D.pct).toFixed(2) + '%</span>' +
         '</div>' +
-        '<span class="price-badge" style="color:' + C.green + ';background:' + C.green + '18;border:1px solid ' + C.green + '44">✓ DATA REAL — NO AI</span>' +
+        '<div class="badge-row">' +
+          '<span class="price-badge" style="color:' + C.green + ';background:' + C.green + '18;border:1px solid ' + C.green + '44">✓ DATA REAL — NO AI</span>' +
+          '<button class="live-toggle" id="liveToggle" data-on="0">⚪ Auto-Update Off</button>' +
+        '</div>' +
       '</div>' +
       '<div class="hero-right">' +
         '<div style="text-align:center">' +
@@ -519,6 +634,19 @@
         '</div>' +
       '</div>' +
     '</div>';
+
+    html += '<div class="perf-strip">' +
+      [["1M", D.perf.w1], ["1B", D.perf.m1], ["3B", D.perf.m3]].map(function (p) {
+        var v = p[1];
+        var txt = v == null ? "–" : (v>=0?"+":"") + v.toFixed(1) + "%";
+        var col = v == null ? C.muted : v>=0?C.green:C.red;
+        return '<div class="perf-cell"><div class="perf-lbl">' + p[0] + '</div><div class="perf-val" style="color:' + col + '">' + txt + '</div></div>';
+      }).join("") +
+      '<div class="perf-cell perf-cell-wide"><div class="perf-lbl">POSISI 52W</div><div class="perf-val" style="color:' + C.cyan + '">' +
+        (D.perf.rangePos!=null ? D.perf.rangePos.toFixed(0) + '% dari Low' : '–') + '</div></div>' +
+    '</div>';
+
+    html += '<div class="watchlist-strip" id="watchlistStrip"></div>';
 
     html += '<div class="tabs">';
     TAB_DEFS.forEach(function (t) {
@@ -566,10 +694,13 @@
         '<div class="panel-title">VOLATILITAS</div>' +
         irow("Posisi vs Bollinger Bands", D.price>D.bb.mid?1:-1, "%B = " + (D.bb.pctB*100).toFixed(0) + "%") +
         '<p class="desc">ATR(14): ' + idr(D.atr) + ' — estimasi pergerakan harga harian wajar. Dipakai untuk hitung Stop Loss otomatis di bawah, bukan angka persentase asal tebak.</p>' +
+        '<div class="ema-note" style="border-color:#c084fc33;background:#c084fc0d">📖 Order book (bid/offer/depth) BUKAN data yang tersedia gratis — itu data Level 2 berlisensi resmi dari BEI. Untuk lihat bid/offer asli, cek aplikasi broker kamu (Stockbit/IPOT/dll). Yang ditampilkan di sini murni dari harga historis publik.</div>' +
       '</div>';
-      html += '<div class="panel"><div class="panel-title">SUPPORT & RESISTANCE</div>';
-      [["R2",D.sr.r2,C.red,false],["R1",D.sr.r1,"#ff8099",false],["● NOW",D.price,C.text,true],["S1",D.sr.s1,"#66ffaa",false],["S2",D.sr.s2,C.green,false]].forEach(function(row){
-        html += '<div class="sr-row"><span class="sr-tag" style="color:'+row[2]+';background:'+(row[3]?"transparent":row[2]+"18")+'">'+row[0]+'</span><span class="sr-val" style="font-size:'+(row[3]?"14.5px":"12.5px")+';font-weight:'+(row[3]?"900":"700")+';color:'+row[2]+'">'+idr(row[1])+'</span></div>';
+      html += '<div class="panel"><div class="panel-title">SUPPORT & RESISTANCE (SWING POINT)</div>' +
+        '<p class="desc" style="margin-bottom:9px">Dideteksi dari titik balik harga asli (fractal), bukan sekadar tertinggi/terendah. Angka sentuhan = berapa kali harga memantul di zona itu.</p>';
+      [["R2",D.sr.r2,C.red,false,null],["R1",D.sr.r1,"#ff8099",false,D.sr.r1Touches],["● NOW",D.price,C.text,true,null],["S1",D.sr.s1,"#66ffaa",false,D.sr.s1Touches],["S2",D.sr.s2,C.green,false,null]].forEach(function(row){
+        var touchBadge = row[4] && row[4]>1 ? ' <span style="font-size:9px;color:'+row[2]+';opacity:0.8">('+row[4]+'x disentuh)</span>' : '';
+        html += '<div class="sr-row"><span class="sr-tag" style="color:'+row[2]+';background:'+(row[3]?"transparent":row[2]+"18")+'">'+row[0]+'</span><span class="sr-val" style="font-size:'+(row[3]?"14.5px":"12.5px")+';font-weight:'+(row[3]?"900":"700")+';color:'+row[2]+'">'+idr(row[1])+touchBadge+'</span></div>';
       });
       html += '</div>';
       if (D.fib) {
@@ -592,8 +723,11 @@
         var label = v.value===1 ? "BULLISH ▲" : v.value===-1 ? "BEARISH ▼" : "NETRAL —";
         html += '<tr><td class="vote-label">' + esc(v.label) + '</td><td class="vote-mark" style="color:' + dC(v.value) + '">' + label + '</td></tr>';
       });
-      html += '</table></div>';
+      html += '</table>' +
+        '<p class="desc" style="margin-top:13px;margin-bottom:0;font-size:11px">ℹ️ Bobot tiap indikator di atas ditentukan manual berdasar praktik umum trading, <b>bukan hasil backtest statistik</b>. Konfluensi tinggi = banyak indikator sepakat secara historis, bukan jaminan arah harga ke depan. Perlakukan sebagai satu input tambahan, bukan keputusan otomatis.</p>' +
+      '</div>';
     }
+
 
     html += '<div class="risk-panel"><div class="panel-title">💼 MANAJEMEN RISIKO — BERBASIS ATR(14)</div>';
     if (D.risk.available) {
@@ -654,7 +788,7 @@
     var trendSign = slopePctPerDay > 0.15 ? 1 : slopePctPerDay < -0.15 ? -1 : 0;
     var trendLabel = trendSign > 0 ? "UPTREND" : trendSign < 0 ? "DOWNTREND" : "SIDEWAYS";
 
-    var sr = supportResistance(c, h, l, 60);
+    var sr = supportResistance(c, h, l, price, 120);
     var recentH = h.slice(-252), recentL = l.slice(-252);
     var h52 = Math.max.apply(null, recentH), l52 = Math.min.apply(null, recentL);
     var fib = null;
@@ -688,6 +822,19 @@
     if (bb && bb.pctB > 1) risks.push("Harga di atas Bollinger upper band — kondisi overextended jangka pendek.");
     if (bb && bb.pctB < 0) cats.push("Harga di bawah Bollinger lower band — area historis rawan pantulan.");
 
+    // Quick performance stats — plain % change vs N trading days ago, and where price
+    // currently sits inside its own 52-week range. All computed straight from real closes.
+    function pctChangeAgo(days) {
+      var idx = c.length - 1 - days;
+      if (idx < 0) return null;
+      var ref = c[idx];
+      return ref ? ((price - ref) / ref) * 100 : null;
+    }
+    var perf = {
+      w1: pctChangeAgo(5), m1: pctChangeAgo(21), m3: pctChangeAgo(63),
+      rangePos: (fib && fib.h52 > fib.l52) ? ((price - fib.l52) / (fib.h52 - fib.l52)) * 100 : null,
+    };
+
     var chartN = Math.min(90, c.length);
     var chartCloses = c.slice(-chartN);
     var chartSma20 = smaSeries(c, 20).slice(-chartN);
@@ -708,7 +855,7 @@
       rsi: rsiV, stoch: stochV, macdHist: macdV.hist, volSign: volSign,
       bb: bb, atr: atrV, sr: sr, fib: fib,
       trendline: { sign: trendSign, label: trendLabel, slopePctPerDay: slopePctPerDay, r2: reg.r2 },
-      confluence: confluence, risk: risk, risks: risks, cats: cats,
+      confluence: confluence, risk: risk, risks: risks, cats: cats, perf: perf,
       chart: { closes: chartCloses, sma20: chartSma20, sma50: chartSma50, bbUpper: bbSeriesU, bbLower: bbSeriesL,
         regSlope: chartReg.slope, regIntercept: chartCloses[chartCloses.length - 20] != null ? null : null,
         s1: sr.s1, r1: sr.r1 },
@@ -726,6 +873,105 @@
   var resultsBox = document.getElementById("resultsBox");
 
   var lastSym = "", lastD = null, activeTab = "trend";
+
+  /* ---------- Watchlist storage: localStorage with in-memory fallback ----------
+     This file is meant to be hosted (GitHub Pages) or run as an installed APK, where
+     localStorage works normally. The try/catch fallback just protects against any
+     restricted/sandboxed preview context where it might be blocked. */
+  var WL_KEY = "saham_watchlist_v1";
+  var memoryWatchlist = [];
+  function loadWatchlist() {
+    try {
+      var raw = window.localStorage.getItem(WL_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return memoryWatchlist.slice(); }
+  }
+  function saveWatchlistArr(arr) {
+    memoryWatchlist = arr.slice();
+    try { window.localStorage.setItem(WL_KEY, JSON.stringify(arr)); } catch (e) { /* in-memory only this session */ }
+  }
+  function isInWatchlist(sym) { return loadWatchlist().indexOf(sym) !== -1; }
+  function toggleWatchlist(sym) {
+    var arr = loadWatchlist();
+    var idx = arr.indexOf(sym);
+    if (idx === -1) arr.push(sym); else arr.splice(idx, 1);
+    saveWatchlistArr(arr);
+    return arr;
+  }
+
+  /* ---------- Live auto-update: polls the lightweight quote endpoint every 30s.
+     Pauses automatically when the page/app is backgrounded (Page Visibility API) so it
+     doesn't burn battery or data on a low-spec phone while the app isn't in view. ---------- */
+  var liveInterval = null, liveSym = null;
+  function stopLive() {
+    if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+    var btn = document.getElementById("liveToggle");
+    if (btn) { btn.classList.remove("on"); btn.setAttribute("data-on", "0"); btn.innerHTML = "⚪ Auto-Update Off"; }
+  }
+  function tickLive() {
+    if (!liveSym || document.hidden) return;
+    fetchQuoteLight(liveSym).then(function (q) {
+      var pEl = document.getElementById("livePrice"), cEl = document.getElementById("livePct");
+      if (pEl) pEl.textContent = idr(q.price);
+      if (cEl) { cEl.textContent = (q.pct>=0?"▲ ":"▼ ") + Math.abs(q.pct).toFixed(2) + "%"; cEl.style.color = q.pct>=0?C.green:C.red; }
+      if (lastD && lastSym === liveSym) { lastD.price = q.price; lastD.pct = q.pct; }
+    }).catch(function () { /* silent — keep last known price on a transient failure */ });
+  }
+  function startLive(sym) {
+    stopLive();
+    liveSym = sym;
+    liveInterval = setInterval(tickLive, 30000);
+    var btn = document.getElementById("liveToggle");
+    if (btn) { btn.classList.add("on"); btn.setAttribute("data-on", "1"); btn.innerHTML = "🟢 Auto-Update On (30s)"; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    // Do an immediate refresh the moment the user comes back, rather than waiting up to 30s.
+    if (!document.hidden && liveInterval) tickLive();
+  });
+
+  var watchlistQuoteCache = {};
+  function renderWatchlistStrip(forceRefresh) {
+    var el = document.getElementById("watchlistStrip");
+    if (!el) return;
+    var list = loadWatchlist();
+    if (!list.length) { el.innerHTML = ""; return; }
+    el.innerHTML = list.map(function (s) {
+      var cached = watchlistQuoteCache[s];
+      var pxHtml = cached
+        ? idr(cached.price) + ' <span class="wl-chip-pct" style="color:' + (cached.pct>=0?C.green:C.red) + '">' + (cached.pct>=0?"▲":"▼") + Math.abs(cached.pct).toFixed(1) + '%</span>'
+        : "…";
+      return '<div class="wl-chip' + (s===lastSym?' current':'') + '" data-sym="' + esc(s) + '">' +
+        '<span class="wl-chip-remove" data-remove="' + esc(s) + '">✕</span>' +
+        '<div class="wl-chip-sym">' + esc(s) + '</div>' +
+        '<div class="wl-chip-px" id="wlpx-' + esc(s) + '">' + pxHtml + '</div>' +
+      '</div>';
+    }).join("");
+    el.querySelectorAll(".wl-chip").forEach(function (chip) {
+      chip.addEventListener("click", function (ev) {
+        if (ev.target.hasAttribute("data-remove")) return;
+        tickerInput.value = chip.getAttribute("data-sym");
+        run();
+      });
+    });
+    el.querySelectorAll("[data-remove]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        toggleWatchlist(btn.getAttribute("data-remove"));
+        renderWatchlistStrip();
+      });
+    });
+    list.forEach(function (s) {
+      if (!forceRefresh && watchlistQuoteCache[s]) return; // already have a value, skip re-fetch
+      fetchQuoteLight(s).then(function (q) {
+        watchlistQuoteCache[s] = q;
+        var pxEl = document.getElementById("wlpx-" + s);
+        if (pxEl) pxEl.innerHTML = idr(q.price) + ' <span class="wl-chip-pct" style="color:' + (q.pct>=0?C.green:C.red) + '">' + (q.pct>=0?"▲":"▼") + Math.abs(q.pct).toFixed(1) + '%</span>';
+      }).catch(function () {
+        var pxEl = document.getElementById("wlpx-" + s);
+        if (pxEl && !watchlistQuoteCache[s]) pxEl.textContent = "–";
+      });
+    });
+  }
 
   tickerInput.addEventListener("input", function () { tickerInput.value = tickerInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
   tickerInput.addEventListener("keydown", function (e) { if (e.key === "Enter") run(); });
@@ -753,6 +999,7 @@
     loadingBox.classList.remove("hidden");
     loadingTitle.textContent = "■ MENGANALISA " + sym + " ■";
     setStep(0);
+    stopLive();
 
     fetchOHLCV(sym).then(function (ohlcv) {
       setStep(1);
@@ -768,6 +1015,8 @@
       resultsBox.innerHTML = renderResults(sym, D, activeTab);
       resultsBox.classList.remove("hidden");
       wireTabs();
+      wireHeroControls();
+      renderWatchlistStrip();
       var canvas = document.getElementById("priceChart");
       if (canvas) drawChart(canvas, {
         closes: D.chart.closes, sma20: D.chart.sma20, sma50: D.chart.sma50,
@@ -777,9 +1026,14 @@
         s1: D.chart.s1, r1: D.chart.r1,
       });
     }).catch(function (e) {
-      var msg = (e && e.message === "ALL_FAILED")
-        ? "Tidak bisa mengambil data historis untuk " + sym + ".JK dari semua sumber (Yahoo Finance + 2 proxy cadangan).\n\nKemungkinan penyebab:\n• Koneksi internet sedang bermasalah\n• Kode saham salah/tidak terdaftar di IDX\n• Jaringan tempat kamu membuka halaman ini memblokir akses ke Yahoo Finance\n\nCoba: refresh halaman, ganti jaringan (WiFi ↔ data seluler), atau coba lagi dalam beberapa menit."
-        : "Terjadi kesalahan: " + ((e && e.message) || "unknown") + "\n\nCoba lagi dalam beberapa saat.";
+      var msg;
+      if (e && e.message === "ALL_FAILED") {
+        var detail = (e.log || []).map(function (a) { return "• " + a.source + ": " + a.reason; }).join("\n");
+        msg = "Tidak bisa mengambil data historis untuk " + sym + ".JK dari 5 sumber yang dicoba:\n\n" + detail +
+          "\n\nKemungkinan penyebab:\n• Kode saham salah/tidak terdaftar di IDX\n• Koneksi internet bermasalah\n• Jaringan tempat halaman ini dibuka memblokir akses ke Yahoo Finance\n\nCoba: refresh, ganti jaringan (WiFi ↔ data seluler), atau coba lagi dalam beberapa menit.";
+      } else {
+        msg = "Terjadi kesalahan: " + ((e && e.message) || "unknown") + "\n\nCoba lagi dalam beberapa saat.";
+      }
       errorMsg.textContent = msg;
       errorBox.classList.remove("hidden");
     }).finally(function () {
@@ -806,6 +1060,8 @@
         activeTab = btn.getAttribute("data-tab");
         resultsBox.innerHTML = renderResults(lastSym, lastD, activeTab);
         wireTabs();
+        wireHeroControls();
+        renderWatchlistStrip();
         if (activeTab === "chart") {
           var canvas = document.getElementById("priceChart");
           if (canvas) drawChart(canvas, {
@@ -817,6 +1073,34 @@
         }
       });
     });
+  }
+
+  // Star (watchlist toggle) + Auto-Update toggle live in the hero card, which gets
+  // fully re-rendered (innerHTML) on every tab switch — so these need re-wiring each time,
+  // and the Auto-Update button's visual state needs to be reconciled with the actual
+  // background timer state (renderResults always draws it "off" by default).
+  function wireHeroControls() {
+    var starBtn = document.getElementById("starBtn");
+    if (starBtn) {
+      starBtn.addEventListener("click", function () {
+        toggleWatchlist(lastSym);
+        var on = isInWatchlist(lastSym);
+        starBtn.textContent = on ? "★" : "☆";
+        starBtn.classList.toggle("active", on);
+        renderWatchlistStrip();
+      });
+    }
+    var liveBtn = document.getElementById("liveToggle");
+    if (liveBtn) {
+      if (liveInterval && liveSym === lastSym) {
+        liveBtn.classList.add("on"); liveBtn.setAttribute("data-on", "1");
+        liveBtn.innerHTML = "🟢 Auto-Update On (30s)";
+      }
+      liveBtn.addEventListener("click", function () {
+        if (liveBtn.getAttribute("data-on") === "1") stopLive();
+        else startLive(lastSym);
+      });
+    }
   }
 
   // Register service worker for installability (best-effort, must not block the app)
